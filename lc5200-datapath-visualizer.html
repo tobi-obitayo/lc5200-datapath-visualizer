@@ -320,21 +320,74 @@
   <div class="datapath-panel">
     <svg id="datapath-svg" viewBox="0 0 960 580" xmlns="http://www.w3.org/2000/svg">
 
+      <defs>
+        <filter id="glow">
+          <feGaussianBlur stdDeviation="2.5" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+
       <!-- ==========================================================
-           MAIN BUS: 3-sided (top horizontal, left vertical, bottom horizontal)
-           Top:    y=12,  x=20 to x=920  (ABOVE all top-row components)
-           Left:   x=20,  y=12 to y=400
-           Bottom: y=400, x=38 to x=920
+           LAYER 1 (BACK): ALL DATA PATHS
+           Drawn first so they render behind bus and components.
+           ========================================================== -->
+
+      <!-- PC paths -->
+      <line id="path-bus-pc" class="data-path" x1="105" y1="12" x2="105" y2="45"/>
+      <line id="path-pc-down" class="data-path" x1="105" y1="85" x2="105" y2="350"/>
+      <line id="path-DrPC-bus" class="data-path" x1="105" y1="375" x2="105" y2="400"/>
+
+      <!-- Reg A paths -->
+      <line id="path-bus-a" class="data-path" x1="210" y1="12" x2="210" y2="45"/>
+      <line id="path-a-alu" class="data-path" x1="225" y1="85" x2="225" y2="150"/>
+
+      <!-- Reg B paths -->
+      <line id="path-bus-b" class="data-path" x1="350" y1="12" x2="350" y2="45"/>
+      <line id="path-b-alu" class="data-path" x1="335" y1="85" x2="335" y2="150"/>
+
+      <!-- MAR paths -->
+      <line id="path-bus-mar" class="data-path" x1="625" y1="12" x2="625" y2="45"/>
+      <line id="path-mar-mem" class="data-path" x1="625" y1="85" x2="625" y2="130"/>
+
+      <!-- IR paths -->
+      <line id="path-bus-ir" class="data-path" x1="870" y1="12" x2="870" y2="45"/>
+      <line id="path-ir-se" class="data-path" x1="870" y1="85" x2="870" y2="120"/>
+      <line id="path-bl-se" class="data-path" x1="870" y1="165" x2="870" y2="190"/>
+
+      <!-- ALU paths -->
+      <line id="path-alu-down" class="data-path" x1="275" y1="280" x2="275" y2="350"/>
+      <line id="path-DrALU-bus" class="data-path" x1="275" y1="375" x2="275" y2="400"/>
+
+      <!-- Register File paths -->
+      <line id="path-bus-regfile" class="data-path" x1="475" y1="12" x2="475" y2="130"/>
+      <line id="path-regfile-down" class="data-path" x1="475" y1="240" x2="475" y2="350"/>
+      <line id="path-DrREG-bus" class="data-path" x1="475" y1="375" x2="475" y2="400"/>
+
+      <!-- Memory paths -->
+      <line id="path-bus-mem-din" class="data-path" x1="695" y1="12" x2="695" y2="130"/>
+      <line id="path-mem-down" class="data-path" x1="665" y1="240" x2="665" y2="350"/>
+      <line id="path-DrMEM-bus" class="data-path" x1="665" y1="375" x2="665" y2="400"/>
+
+      <!-- Sign Extend paths -->
+      <line id="path-se-down" class="data-path" x1="870" y1="240" x2="870" y2="350"/>
+      <line id="path-DrOFF-bus" class="data-path" x1="870" y1="375" x2="870" y2="400"/>
+
+      <!-- Comparison Logic paths -->
+      <line id="path-alu-cmp" class="data-path" x1="180" y1="400" x2="180" y2="460"/>
+      <line id="path-cmp-out" class="data-path" x1="180" y1="510" x2="180" y2="545"/>
+      <line id="path-cmp-out-2" class="data-path" x1="180" y1="545" x2="410" y2="545"/>
+
+      <!-- ==========================================================
+           LAYER 2 (MIDDLE): MAIN BUS
+           Drawn after paths so it covers path/bus intersections.
            ========================================================== -->
       <polyline id="bus-main" class="bus-line" points="920,12 20,12 20,400 920,400"/>
       <text x="18" y="210" class="signal-label" style="font-size:10px;fill:#2c3e50;font-weight:700;"
             transform="rotate(-90,15,210)">BUS</text>
 
-
       <!-- ==========================================================
-           TOP ROW: PC, A, B, MAR, IR  (y=25..65)
-           These sit ABOVE the top bus segment (y=82).
-           Load signals connect from top bus UP to component.
+           LAYER 3 (FRONT): COMPONENTS, TRI-STATES, LABELS, CONTROLS
+           Drawn last so components sit on top of everything.
            ========================================================== -->
 
       <!-- ===== PC ===== -->
@@ -342,73 +395,41 @@
       <text x="105" y="65" class="comp-label">PC</text>
       <text id="lbl-LdPC" class="signal-label" x="40" y="60">LdPC</text>
       <line id="ctrl-LdPC" class="ctrl-line" x1="64" y1="58" x2="70" y2="58"/>
-      <!-- LdPC path: top bus down to PC top -->
-      <line id="path-bus-pc" class="data-path" x1="105" y1="12" x2="105" y2="45"/>
-      <!-- PC output down to DrPC tri-state driver -->
-      <line id="path-pc-down" class="data-path" x1="105" y1="85" x2="105" y2="350"/>
       <polygon id="tri-DrPC" class="tri-state" points="90,350 120,350 105,375"/>
       <text id="lbl-DrPC" class="signal-label" x="68" y="365">DrPC</text>
-      <!-- DrPC tri-state to bottom bus -->
-      <line id="path-DrPC-bus" class="data-path" x1="105" y1="375" x2="105" y2="400"/>
 
       <!-- ===== REG A ===== -->
       <rect id="comp-a" class="comp-rect" x="195" y="45" width="60" height="40" rx="3"/>
       <text x="225" y="65" class="comp-label">A</text>
       <text id="lbl-LdA" class="signal-label" x="170" y="60">LdA</text>
       <line id="ctrl-LdA" class="ctrl-line" x1="190" y1="58" x2="195" y2="58"/>
-      <!-- LdA path: top bus down to A -->
-      <line id="path-bus-a" class="data-path" x1="210" y1="12" x2="210" y2="45"/>
-      <!-- A output down to ALU left input -->
-      <line id="path-a-alu" class="data-path" x1="225" y1="85" x2="225" y2="150"/>
 
       <!-- ===== REG B ===== -->
       <rect id="comp-b" class="comp-rect" x="305" y="45" width="60" height="40" rx="3"/>
       <text x="335" y="65" class="comp-label">B</text>
       <text id="lbl-LdB" class="signal-label" x="374" y="60">LdB</text>
       <line id="ctrl-LdB" class="ctrl-line" x1="365" y1="58" x2="370" y2="58"/>
-      <!-- LdB path: top bus down to B -->
-      <line id="path-bus-b" class="data-path" x1="350" y1="12" x2="350" y2="45"/>
-      <!-- B output down to ALU right input -->
-      <line id="path-b-alu" class="data-path" x1="335" y1="85" x2="335" y2="150"/>
 
       <!-- ===== MAR ===== -->
       <rect id="comp-mar" class="comp-rect" x="590" y="45" width="70" height="40" rx="3"/>
       <text x="625" y="65" class="comp-label">MAR</text>
       <text id="lbl-LdMAR" class="signal-label" x="555" y="60">LdMAR</text>
       <line id="ctrl-LdMAR" class="ctrl-line" x1="585" y1="58" x2="590" y2="58"/>
-      <!-- LdMAR path: top bus down to MAR top -->
-      <line id="path-bus-mar" class="data-path" x1="625" y1="12" x2="625" y2="45"/>
-      <!-- MAR output down to Memory Addr input -->
-      <line id="path-mar-mem" class="data-path" x1="625" y1="85" x2="625" y2="130"/>
       <text x="612" y="103" class="comp-sublabel" style="font-size:8px;">16</text>
       <line id="ctrl-LdMAR" class="ctrl-line" x1="620" y1="105" x2="630" y2="100"/>
-
-
 
       <!-- ===== IR ===== -->
       <rect id="comp-ir" class="comp-rect" x="835" y="45" width="70" height="40" rx="3"/>
       <text x="870" y="65" class="comp-label">IR</text>
       <text id="lbl-LdIR" class="signal-label" x="805" y="60">LdIR</text>
       <line id="ctrl-LdIR" class="ctrl-line" x1="830" y1="58" x2="835" y2="58"/>
-      <!-- LdIR path: top bus down to IR top -->
-      <line id="path-bus-ir" class="data-path" x1="870" y1="12" x2="870" y2="45"/>
-      <!-- IR[31:0] label on below side -->
       <text x="870" y="125" class="comp-sublabel" style="text-anchor:middle;">IR[31:0]</text>
-      <!-- IR[19:0] output down to Sign Extend -->
-      <line id="path-bl-se" class="data-path" x1="870" y1="165" x2="870" y2="190"/>
-      <line id="path-ir-se" class="data-path" x1="870" y1="85" x2="870" y2="120"/>
       <text x="870" y="160" class="comp-sublabel" style="text-anchor:middle;">IR[19:0]</text>
-
-      <!-- ==========================================================
-           MIDDLE ROW: ALU, Register File, Memory, Sign Extend
-           These sit between top bus (y=82) and bottom bus (y=400).
-           ========================================================== -->
 
       <!-- ===== ALU ===== -->
       <polygon id="comp-alu" class="comp-rect" points="190,130 360,130 330,280 220,280"/>
       <text x="275" y="160" class="comp-label">ALU</text>
       <text id="alu-func-text" x="275" y="180" class="comp-sublabel">func: ADD</text>
-      <!-- ALU function codes inside -->
       <text x="275" y="205" class="comp-sublabel" style="text-anchor:middle;font-size:10px;fill:#555;">
         <tspan x="275" dy="0">000: ADD</tspan>
         <tspan x="275" dy="10">001: SUB</tspan>
@@ -417,74 +438,49 @@
         <tspan x="275" dy="10">100: PASS A</tspan>
         <tspan x="275" dy="10">101: PASS B</tspan>
       </text>
-      <!-- ALU func control -->
       <text id="lbl-ALUfunc" class="signal-label" x="160" y="202">func</text>
       <line id="ctrl-ALUfunc" class="ctrl-line" x1="185" y1="200" x2="205" y2="200"/>
       <text x="190" y="210" class="comp-sublabel" style="font-size:7px;text-anchor:middle;">3</text>
       <line id="ctrl-ALUfuncbit" class="ctrl-line" x1="190" y1="205" x2="195" y2="195"/>
-      <!-- ALU output down to DrALU tri-state -->
-      <line id="path-alu-down" class="data-path" x1="275" y1="280" x2="275" y2="350"/>
       <polygon id="tri-DrALU" class="tri-state" points="260,350 290,350 275,375"/>
       <text id="lbl-DrALU" class="signal-label" x="238" y="365">DrALU</text>
-      <!-- DrALU to bottom bus -->
-      <line id="path-DrALU-bus" class="data-path" x1="275" y1="375" x2="275" y2="400"/>
 
       <!-- ===== REGISTER FILE ===== -->
       <rect id="comp-regfile" class="comp-rect" x="410" y="130" width="130" height="110" rx="3"/>
       <text x="475" y="170" class="comp-label">Registers</text>
       <text x="475" y="187" class="comp-sublabel">16 x 32 bits</text>
-      <!-- WrREG control on LEFT side -->
       <text id="lbl-WrREG" class="signal-label" x="400" y="150" style="text-anchor:end;">WrREG</text>
       <line id="ctrl-WrREG" class="ctrl-line" x1="405" y1="148" x2="410" y2="148"/>
-      <!-- Din on TOP -->
-      <line id="path-bus-regfile" class="data-path" x1="475" y1="12" x2="475" y2="130"/>
       <text x="475" y="140" class="comp-sublabel" style="text-anchor:middle;">Din</text>
-      <!-- regno on LEFT side, below WrREG -->
       <text x="398" y="209" class="comp-sublabel" style="text-anchor:end;">regno</text>
       <line class="ctrl-line" x1="402" y1="210" x2="410" y2="210"/>
       <text x="405" y="220" class="comp-sublabel" style="text-anchor:end;font-size:7px;">4</text>
       <text id="regno-text" x="385" y="200" class="comp-sublabel" style="text-anchor:middle;fill:#2980b9;font-weight:600;">Ry</text>
-      <!-- Dout on BOTTOM, down to DrREG tri-state -->
-      <line id="path-regfile-down" class="data-path" x1="475" y1="240" x2="475" y2="350"/>
       <line id="ctrl-regnobits" class="ctrl-line" x1="403" y1="214" x2="407" y2="206"/>
       <text x="475" y="230" class="comp-sublabel" style="text-anchor:middle;">Dout</text>
       <polygon id="tri-DrREG" class="tri-state" points="460,350 490,350 475,375"/>
       <text id="lbl-DrREG" class="signal-label" x="438" y="365">DrREG</text>
-      <!-- DrREG to bottom bus -->
-      <line id="path-DrREG-bus" class="data-path" x1="475" y1="375" x2="475" y2="400"/>
 
       <!-- ===== MEMORY ===== -->
       <rect id="comp-mem" class="comp-rect" x="600" y="130" width="130" height="110" rx="3"/>
       <text x="665" y="170" class="comp-label">Memory</text>
       <text x="665" y="187" class="comp-sublabel">2^16 x 32 bits</text>
-      <!-- WrMEM control on LEFT side -->
       <text id="lbl-WrMEM" class="signal-label" x="590" y="150" style="text-anchor:end;">WrMEM</text>
       <line id="ctrl-WrMEM" class="ctrl-line" x1="595" y1="148" x2="600" y2="148"/>
-      <!-- Din on TOP (to right of Addr) -->
-      <line id="path-bus-mem-din" class="data-path" x1="695" y1="12" x2="695" y2="130"/>
       <text x="698" y="140" class="comp-sublabel" style="text-anchor:middle;">Din</text>
-      <!-- Dout on BOTTOM, down to DrMEM tri-state -->
-      <line id="path-mem-down" class="data-path" x1="665" y1="240" x2="665" y2="350"/>
       <text x="665" y="230" class="comp-sublabel" style="text-anchor:middle;">Dout</text>
       <polygon id="tri-DrMEM" class="tri-state" points="650,350 680,350 665,375"/>
       <text id="lbl-DrMEM" class="signal-label" x="628" y="365">DrMEM</text>
-      <!-- DrMEM to bottom bus -->
-      <line id="path-DrMEM-bus" class="data-path" x1="665" y1="375" x2="665" y2="400"/>
       <text x="628" y="140" class="comp-sublabel">Addr</text>
-      <!-- ===== SIGN EXTEND (directly below IR) ===== -->
+
+      <!-- ===== SIGN EXTEND ===== -->
       <rect id="comp-se" class="comp-rect" x="835" y="190" width="70" height="50" rx="3"/>
       <text x="870" y="205" class="comp-label" style="font-size:11px;">Sign</text>
       <text x="870" y="220" class="comp-label" style="font-size:11px;">Extend</text>
-      <!-- Sign Extend output down to DrOFF tri-state -->
-      <line id="path-se-down" class="data-path" x1="870" y1="240" x2="870" y2="350"/>
       <polygon id="tri-DrOFF" class="tri-state" points="855,350 885,350 870,375"/>
       <text id="lbl-DrOFF" class="signal-label" x="833" y="365">DrOFF</text>
-      <!-- DrOFF to bottom bus -->
-      <line id="path-DrOFF-bus" class="data-path" x1="870" y1="375" x2="870" y2="400"/>
 
-      <!-- ==========================================================
-           COMPARISON LOGIC: below bottom bus
-           ========================================================== -->
+      <!-- ===== COMPARISON LOGIC ===== -->
       <rect id="comp-cmp" class="comp-rect" x="115" y="460" width="130" height="50" rx="3"/>
       <text x="180" y="480" class="comp-label" style="font-size:11px;">Comparison</text>
       <text x="180" y="496" class="comp-label" style="font-size:11px;">Logic</text>
@@ -492,11 +488,6 @@
       <line id="ctrl-ChkCmp" class="ctrl-line" x1="105" y1="478" x2="115" y2="478"/>
       <line id="ctrl-ChkCmpdata" class="ctrl-line" x1="107" y1="482" x2="112" y2="474"/>
       <text x="110" y="488" class="comp-sublabel" style="font-size:7px;text-anchor:end;">2</text>
-      <!-- Connection from bottom bus DOWN to comparison logic -->
-      <line id="path-alu-cmp" class="data-path" x1="180" y1="400" x2="180" y2="460"/>
-      <!-- CmpTrue output -->
-      <line id="path-cmp-out" class="data-path" x1="180" y1="510" x2="180" y2="545"/>      
-      <line id="path-cmp-out-2" class="data-path" x1="180" y1="545" x2="410" y2="545"/>
       <text x="420" y="544" class="comp-sublabel" style="text-anchor:start;font-size:9px;">CmpTrue - to microcontroller</text>
       <text x="190" y="558" class="comp-sublabel" style="text-anchor:end;font-size:7px;">1</text>
       <line id="ctrl-cmpoutdata" class="ctrl-line" x1="187" y1="550" x2="192" y2="542"/>
@@ -509,13 +500,7 @@
         <tspan x="420" dy="14">IR[3:0]      -- Rz: 4-bit register number</tspan>
       </text>
 
-      <!-- ===== ANIMATION ELEMENTS ===== -->
-      <defs>
-        <filter id="glow">
-          <feGaussianBlur stdDeviation="2.5" result="blur"/>
-          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
-      </defs>
+      <!-- ===== ANIMATION ELEMENTS (topmost layer) ===== -->
       <circle id="anim-dot" class="anim-dot" r="6" fill="#e74c3c" opacity="0" filter="url(#glow)"/>
       <path id="anim-route" fill="none" stroke="none" d=""/>
 
