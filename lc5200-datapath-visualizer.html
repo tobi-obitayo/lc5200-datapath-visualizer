@@ -257,6 +257,11 @@
     stroke-dasharray: none;
   }
 
+  /* ========== ANIMATION DOT ========== */
+  .anim-dot {
+    pointer-events: none;
+  }
+
   /* ========== KEYBOARD HINT ========== */
   .toggle-label {
     font-size: 12px;
@@ -300,6 +305,7 @@
   <button class="btn" id="btn-prev" disabled>&larr; Previous</button>
   <button class="btn btn-primary" id="btn-next">Next &rarr;</button>
   <label class="toggle-label"><input type="checkbox" id="fetch-toggle" checked> Show Fetch</label>
+  <label class="toggle-label"><input type="checkbox" id="anim-toggle" checked> Animate Flow</label>
   <span class="kb-hint">Use <kbd>&larr;</kbd> <kbd>&rarr;</kbd> arrow keys</span>
   <div class="cycle-info">
     <div id="cycle-counter">Cycle 1/6</div>
@@ -493,7 +499,7 @@
       <line id="path-cmp-out-2" class="data-path" x1="180" y1="545" x2="410" y2="545"/>
       <text x="420" y="544" class="comp-sublabel" style="text-anchor:start;font-size:9px;">CmpTrue - to microcontroller</text>
       <text x="190" y="558" class="comp-sublabel" style="text-anchor:end;font-size:7px;">1</text>
-      <line id="ctrl-cmpoutdata" class="ctrl-line" x1="187" y1="546" x2="192" y2="544"/>
+      <line id="ctrl-cmpoutdata" class="ctrl-line" x1="187" y1="550" x2="192" y2="542"/>
 
       <!-- ===== IR DECODE LABELS ===== -->
       <text x="420" y="470" class="comp-sublabel" style="text-anchor:start;font-size:9px;fill:#34495e;">
@@ -502,6 +508,16 @@
         <tspan x="420" dy="14">IR[23:20] -- Ry: 4-bit register number</tspan>
         <tspan x="420" dy="14">IR[3:0]      -- Rz: 4-bit register number</tspan>
       </text>
+
+      <!-- ===== ANIMATION ELEMENTS ===== -->
+      <defs>
+        <filter id="glow">
+          <feGaussianBlur stdDeviation="2.5" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      <circle id="anim-dot" class="anim-dot" r="6" fill="#e74c3c" opacity="0" filter="url(#glow)"/>
+      <path id="anim-route" fill="none" stroke="none" d=""/>
 
     </svg>
   </div>
@@ -755,6 +771,63 @@ const HIGHLIGHT_MAP = {
 const EXTRA_COMPONENTS_DRALU = ['comp-a','comp-b'];
 
 /* ============================================================
+   ANIMATION FLOW ROUTES
+   Maps drive signals to source waypoints and load signals to
+   destination waypoints. The bus U-path connects them.
+   ============================================================ */
+const DRIVE_SOURCES = {
+  DrPC:  [[105,85], [105,375], [105,400]],
+  DrALU: [[275,280], [275,375], [275,400]],
+  DrREG: [[475,240], [475,375], [475,400]],
+  DrMEM: [[665,240], [665,375], [665,400]],
+  DrOFF: [[870,240], [870,375], [870,400]],
+};
+
+const LOAD_DESTS = {
+  LdPC:  { busX: 105, end: [105,45] },
+  LdA:   { busX: 210, end: [210,45] },
+  LdB:   { busX: 350, end: [350,45] },
+  LdMAR: { busX: 625, end: [625,45] },
+  LdIR:  { busX: 870, end: [870,45] },
+  WrREG: { busX: 475, end: [475,130] },
+  WrMEM: { busX: 695, end: [695,130] },
+};
+
+function buildFlowRoute(state) {
+  const sig = state.signals;
+
+  // Find active drive signal
+  let driveKey = null;
+  for (const key of Object.keys(DRIVE_SOURCES)) {
+    if (sig[key]) { driveKey = key; break; }
+  }
+  if (!driveKey) return null;
+
+  // Find first active load/write destination
+  let destKey = null;
+  for (const key of Object.keys(LOAD_DESTS)) {
+    if (sig[key]) { destKey = key; break; }
+  }
+  if (!destKey) return null;
+
+  const srcPts = DRIVE_SOURCES[driveKey];
+  const dest = LOAD_DESTS[destKey];
+
+  // Build waypoints: source → bottom bus → left corner → top bus → destination
+  const waypoints = [
+    ...srcPts,
+    [20, 400],   // bottom-left corner
+    [20, 12],    // top-left corner
+    [dest.busX, 12],  // along top bus to destination x
+    dest.end     // down into component
+  ];
+
+  // Convert to SVG path d attribute
+  const d = waypoints.map((p, i) => (i === 0 ? 'M' : 'L') + p[0] + ',' + p[1]).join(' ');
+  return d;
+}
+
+/* ============================================================
    DOM REFERENCES
    ============================================================ */
 const instrSelect = document.getElementById('instr-select');
@@ -771,7 +844,11 @@ const regnoText = document.getElementById('regno-text');
 let currentInstr = 'ADD';
 let currentCycle = 0;
 let showFetch = true;
+let animateFlow = true;
 const fetchToggle = document.getElementById('fetch-toggle');
+const animToggle = document.getElementById('anim-toggle');
+const animDot = document.getElementById('anim-dot');
+const animRoute = document.getElementById('anim-route');
 
 function getActiveCycles() {
   const all = INSTRUCTIONS[currentInstr];
@@ -807,6 +884,11 @@ function clearHighlights() {
       el.querySelector('.signal-value').textContent = '0';
     }
   });
+
+  // Stop animation
+  animDot.setAttribute('opacity', '0');
+  const oldAnim = animDot.querySelector('animateMotion');
+  if (oldAnim) oldAnim.remove();
 }
 
 /* ============================================================
@@ -912,6 +994,23 @@ function applyState(state) {
 
   btnPrev.disabled = (currentCycle === 0);
   btnNext.disabled = (currentCycle >= cycles.length - 1);
+
+  // Animate data flow pulse
+  if (animateFlow) {
+    const routeD = buildFlowRoute(state);
+    if (routeD) {
+      animRoute.setAttribute('d', routeD);
+      animDot.setAttribute('opacity', '0.9');
+      const motion = document.createElementNS('http://www.w3.org/2000/svg', 'animateMotion');
+      motion.setAttribute('dur', '1.8s');
+      motion.setAttribute('repeatCount', 'indefinite');
+      motion.setAttribute('fill', 'freeze');
+      const mpath = document.createElementNS('http://www.w3.org/2000/svg', 'mpath');
+      mpath.setAttributeNS('http://www.w3.org/1999/xlink', 'href', '#anim-route');
+      motion.appendChild(mpath);
+      animDot.appendChild(motion);
+    }
+  }
 }
 
 /* ============================================================
@@ -934,6 +1033,11 @@ fetchToggle.addEventListener('change', () => {
   showFetch = fetchToggle.checked;
   currentCycle = 0;
   goToCycle(0);
+});
+
+animToggle.addEventListener('change', () => {
+  animateFlow = animToggle.checked;
+  goToCycle(currentCycle);
 });
 
 btnPrev.addEventListener('click', () => goToCycle(currentCycle - 1));
