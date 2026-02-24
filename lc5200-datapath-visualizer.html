@@ -71,6 +71,7 @@
   .btn:disabled { opacity: 0.4; cursor: not-allowed; background: #ecf0f1; }
   .btn-primary { background: #3498db; color: #fff; border-color: #2980b9; }
   .btn-primary:hover:not(:disabled) { background: #2980b9; }
+  .btn-primary:disabled { color: #555; }
 
   .cycle-info {
     font-size: 13px;
@@ -829,7 +830,7 @@ const regnoText = document.getElementById('regno-text');
 
 let currentInstr = 'ADD';
 let currentCycle = 0;
-let showFetch = true;
+let showFetch = false;
 let animateFlow = true;
 const fetchToggle = document.getElementById('fetch-toggle');
 const animToggle = document.getElementById('anim-toggle');
