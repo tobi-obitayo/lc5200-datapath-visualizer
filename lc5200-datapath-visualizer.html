@@ -305,7 +305,7 @@
   <select id="instr-select"></select>
   <button class="btn" id="btn-prev" disabled>&larr; Previous</button>
   <button class="btn btn-primary" id="btn-next">Next &rarr;</button>
-  <label class="toggle-label"><input type="checkbox" id="fetch-toggle" checked> Show Fetch</label>
+  <label class="toggle-label"><input type="checkbox" id="fetch-toggle" unchecked> Show Fetch</label>
   <label class="toggle-label"><input type="checkbox" id="anim-toggle" checked> Animate Flow</label>
   <span class="kb-hint">Use <kbd>&larr;</kbd> <kbd>&rarr;</kbd> arrow keys</span>
   <div class="cycle-info">
@@ -988,7 +988,7 @@ function applyState(state) {
       animRoute.setAttribute('d', routeD);
       animDot.setAttribute('opacity', '0.9');
       const motion = document.createElementNS('http://www.w3.org/2000/svg', 'animateMotion');
-      motion.setAttribute('dur', '1.8s');
+      motion.setAttribute('dur', '4s');
       motion.setAttribute('repeatCount', 'indefinite');
       motion.setAttribute('fill', 'freeze');
       const mpath = document.createElementNS('http://www.w3.org/2000/svg', 'mpath');
