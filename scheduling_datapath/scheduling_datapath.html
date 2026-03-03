@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CPU Scheduler Visualizer</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter','Roboto','Segoe UI',sans-serif; background:#f5f5f5; color:#2c3e50; min-height:100vh; }
+
+  /* HEADER */
+  .header { background:#2c3e50; color:#fff; padding:14px 24px; display:flex; align-items:center; justify-content:space-between; }
+  .header h1 { font-size:18px; font-weight:600; letter-spacing:0.3px; }
+  .header-subtitle { font-size:12px; color:#95a5a6; font-weight:400; }
+
+  /* CONTROL BAR */
+  .control-bar { background:#fff; border-bottom:1px solid #dcdde1; padding:12px 24px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .control-bar label { font-size:13px; font-weight:600; color:#34495e; }
+  .control-bar select { font-family:inherit; font-size:13px; padding:6px 10px; border:1px solid #bdc3c7; border-radius:3px; background:#fff; color:#2c3e50; cursor:pointer; min-width:220px; }
+  .control-bar select:focus { outline:none; border-color:#3498db; }
+  #quantum-wrap { display:none; align-items:center; gap:8px; }
+  #quantum-wrap.visible { display:flex; }
+  #quantum-input { font-family:inherit; font-size:13px; padding:6px 8px; border:1px solid #bdc3c7; border-radius:3px; width:60px; color:#2c3e50; }
+  #quantum-input:focus { outline:none; border-color:#3498db; }
+  .stat-summary { margin-left:auto; display:flex; gap:12px; }
+  .stat-pill { font-size:12px; color:#7f8c8d; background:#f8f9fa; border:1px solid #dcdde1; border-radius:3px; padding:4px 10px; }
+  .stat-pill span { font-weight:700; color:#2c3e50; font-family:'Consolas','Monaco',monospace; }
+
+  /* BUTTONS */
+  .btn { font-family:inherit; font-size:13px; padding:6px 14px; border:1px solid #bdc3c7; border-radius:3px; background:#ecf0f1; color:#2c3e50; cursor:pointer; font-weight:500; transition:background .15s; }
+  .btn:hover:not(:disabled) { background:#d5dbdb; }
+  .btn:disabled { opacity:.4; cursor:not-allowed; background:#ecf0f1; }
+  .btn-primary { background:#3498db; color:#fff; border-color:#2980b9; }
+  .btn-primary:hover:not(:disabled) { background:#2980b9; }
+  .btn-primary:disabled { color:#555; }
+  .btn-sm { font-size:11px; padding:3px 9px; }
+
+  /* TOGGLE SWITCH */
+  .toggle-switch { position:relative; display:inline-block; width:40px; height:22px; flex-shrink:0; }
+  .toggle-switch input { opacity:0; width:0; height:0; }
+  .toggle-slider { position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background:#bdc3c7; border-radius:22px; transition:.2s; }
+  .toggle-slider::before { position:absolute; content:""; height:16px; width:16px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:.2s; }
+  input:checked + .toggle-slider { background:#3498db; }
+  input:checked + .toggle-slider::before { transform:translateX(18px); }
+
+  /* MAIN LAYOUT */
+  .main { display:flex; gap:16px; padding:16px 24px; align-items:flex-start; }
+
+  /* LEFT PANEL */
+  .left-panel { background:#fff; border:1px solid #dcdde1; border-radius:3px; padding:14px; width:276px; flex-shrink:0; }
+  .panel-title { font-size:13px; font-weight:600; color:#2c3e50; margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid #f0f0f0; display:flex; justify-content:space-between; align-items:center; }
+  .process-row { margin-bottom:10px; padding:10px; border:1px solid #dcdde1; border-radius:3px; }
+  .proc-row-header { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+  .proc-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+  .proc-lbl { font-size:13px; font-weight:600; }
+  .remove-btn { margin-left:auto; font-size:11px; color:#e74c3c; background:none; border:none; cursor:pointer; padding:2px 5px; border-radius:2px; line-height:1; }
+  .remove-btn:hover { background:#fde8e8; }
+  .field-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  .field-grp { display:flex; flex-direction:column; gap:3px; }
+  .field-grp label { font-size:10px; font-weight:600; color:#7f8c8d; text-transform:uppercase; letter-spacing:0.3px; }
+  .field-grp input { font-family:'Consolas','Monaco',monospace; font-size:13px; padding:4px 6px; border:1px solid #bdc3c7; border-radius:3px; width:100%; color:#2c3e50; }
+  .field-grp input:focus { outline:none; border-color:#3498db; }
+
+  /* RIGHT PANEL */
+  .right-panel { flex:1; min-width:0; display:flex; flex-direction:column; gap:14px; }
+
+  /* TIMELINE */
+  .timeline-container { background:#fff; border:1px solid #dcdde1; border-radius:3px; overflow-x:auto; }
+  .timeline-inner { padding:16px; min-width:max-content; }
+  .placeholder { color:#95a5a6; font-size:13px; padding:32px; text-align:center; }
+
+  /* STATS */
+  .stats-section { background:#fff; border:1px solid #dcdde1; border-radius:3px; padding:14px; }
+  .stat-boxes { display:flex; gap:12px; margin-bottom:14px; }
+  .stat-box { flex:1; text-align:center; background:#f8f9fa; border:1px solid #dcdde1; border-radius:3px; padding:10px; }
+  .stat-box-label { font-size:11px; color:#7f8c8d; font-weight:600; text-transform:uppercase; letter-spacing:0.3px; margin-bottom:4px; }
+  .stat-box-val { font-size:22px; font-weight:700; font-family:'Consolas','Monaco',monospace; color:#2c3e50; }
+  .stats-table { width:100%; border-collapse:collapse; font-size:12px; }
+  .stats-table th { background:#ecf0f1; text-align:left; padding:6px 10px; font-weight:600; color:#34495e; border:1px solid #dcdde1; white-space:nowrap; }
+  .stats-table td { padding:6px 10px; border:1px solid #dcdde1; font-family:'Consolas','Monaco',monospace; color:#2c3e50; white-space:nowrap; }
+  .stats-table tbody tr:nth-child(even) td { background:#f8f9fa; }
+  .stats-table tr.avg-row td { font-weight:700; background:#ecf0f1 !important; }
+  .proc-badge { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; vertical-align:middle; }
+  .algo-banner { background:#f8f9fa; border-bottom:1px solid #dcdde1; overflow:hidden; max-height:0; transition:max-height 0.25s ease; }
+  .algo-banner.open { max-height:80px; }
+  .algo-banner-inner { padding:6px 24px; font-size:12px; color:#7f8c8d; font-style:italic; line-height:1.5; }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div>
+    <h1>CPU Scheduler Visualizer</h1>
+    <div class="header-subtitle">CS 2200 — Process Scheduling</div>
+  </div>
+</header>
+
+<div class="control-bar">
+  <label for="algo-select">Algorithm</label>
+  <select id="algo-select">
+    <option value="FCFS">First Come First Serve (FCFS)</option>
+    <option value="SJF">Shortest Job First (SJF)</option>
+    <option value="SRTF">Shortest Remaining Time First (SRTF)</option>
+    <option value="RR">Round Robin</option>
+    <option value="PRIORITY">Preemptive Priority</option>
+    <option value="PRIORITY_NP">Non-Preemptive Priority</option>
+  </select>
+  <button id="algo-info-btn" class="btn btn-sm" onclick="toggleAlgoBanner()" title="About this algorithm" style="font-size:14px; padding:3px 9px; color:#7f8c8d;">ⓘ</button>
+  <div id="quantum-wrap">
+    <label for="quantum-input">Quantum</label>
+    <input type="number" id="quantum-input" value="2" min="1" max="20">
+  </div>
+  <button class="btn btn-primary" id="run-btn">Run</button>
+  <button class="btn" id="btn-randomize">Randomize</button>
+  <div id="step-controls" style="display:none; align-items:center; gap:6px;">
+    <button class="btn btn-sm" id="btn-prev-step" onclick="stepBy(-1)">◀ Prev</button>
+    <span id="step-tick-label" style="font-size:13px; font-weight:600; color:#2c3e50; min-width:50px; text-align:center;">t = 0</span>
+    <button class="btn btn-sm" id="btn-next-step" onclick="stepBy(1)">Next ▶</button>
+  </div>
+  <button class="btn" id="settings-btn" onclick="openSettings()" title="Settings">Settings</button>
+  <div class="stat-summary" id="stat-summary" style="display:none">
+    <div class="stat-pill">Avg TAT: <span id="sum-tat">—</span></div>
+    <div class="stat-pill">Avg Wait: <span id="sum-wait">—</span></div>
+    <div class="stat-pill">CPU Util: <span id="sum-util">—</span></div>
+  </div>
+</div>
+
+<div class="algo-banner" id="algo-banner-wrap"><div class="algo-banner-inner" id="algo-explainer"></div></div>
+
+<div class="main">
+  <div class="left-panel">
+    <div class="panel-title">
+      Processes
+      <div style="display:flex; align-items:center; gap:6px;">
+        <span id="save-indicator" style="font-size:11px; color:#27ae60; opacity:0; transition:opacity 0.3s; font-weight:400;">✓ Saved</span>
+        <button class="btn btn-sm" id="reset-btn">Reset</button>
+        <button class="btn btn-sm" id="add-btn">+ Add</button>
+      </div>
+    </div>
+    <div id="proc-list"></div>
+  </div>
+
+  <div class="right-panel">
+    <div class="timeline-container">
+      <div class="timeline-inner" id="timeline-inner">
+        <div class="placeholder">Configure processes and click Run to see the schedule.</div>
+      </div>
+    </div>
+    <div id="step-log" style="display:none; background:#fff; border:1px solid #dcdde1; border-radius:3px; padding:10px 14px; font-size:12px; font-family:'Consolas','Monaco',monospace; color:#2c3e50; min-height:36px;">
+      <span id="step-log-text" style="color:#7f8c8d;">Run simulation then use Prev/Next to step through.</span>
+    </div>
+    <div class="stats-section" id="stats-section" style="display:none">
+      <div class="stat-boxes">
+        <div class="stat-box"><div class="stat-box-label">Avg Turnaround</div><div class="stat-box-val" id="box-tat">—</div></div>
+        <div class="stat-box"><div class="stat-box-label">Avg Waiting</div><div class="stat-box-val" id="box-wait">—</div></div>
+        <div class="stat-box"><div class="stat-box-label">CPU Utilization</div><div class="stat-box-val" id="box-util">—</div></div>
+      </div>
+      <table class="stats-table" id="stats-table"></table>
+    </div>
+  </div>
+</div>
+
+<!-- Hover tooltip -->
+<div id="svg-tooltip" style="display:none; position:fixed; z-index:200; background:#2c3e50; color:#fff; font-size:12px; font-family:'Consolas','Monaco',monospace; padding:6px 10px; border-radius:3px; pointer-events:none; white-space:nowrap; box-shadow:0 2px 8px rgba(0,0,0,0.2);"></div>
+
+<!-- Settings backdrop -->
+<div id="settings-backdrop" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.2); z-index:99;" onclick="closeSettings()"></div>
+
+<!-- Settings panel -->
+<div id="settings-panel" style="position:fixed; top:0; right:-320px; width:320px; height:100vh; background:#fff; border-left:1px solid #dcdde1; box-shadow:-4px 0 16px rgba(0,0,0,0.1); z-index:100; transition:right 0.25s ease; display:flex; flex-direction:column;">
+  <div style="background:#34495e; color:#fff; padding:14px 16px; display:flex; justify-content:space-between; align-items:center;">
+    <span style="font-weight:600; font-size:14px;">Settings</span>
+    <button onclick="closeSettings()" style="background:none; border:none; color:#fff; font-size:18px; cursor:pointer; line-height:1;">×</button>
+  </div>
+  <div style="flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:20px;">
+
+    <!-- Display -->
+    <div>
+      <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#7f8c8d; margin-bottom:10px;">Display</div>
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-size:13px; color:#34495e; font-weight:500;">Compact view</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="view-toggle-input" checked onchange="onViewToggle(this)">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div style="font-size:13px; color:#34495e; font-weight:500;">Concurrent I/O</div>
+            <div id="io-mode-hint" style="font-size:11px; color:#7f8c8d; font-style:italic;">CS 2200 mode</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="io-toggle-input" onchange="onIOToggle(this)">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Simulation -->
+    <div>
+      <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#7f8c8d; margin-bottom:10px;">Simulation</div>
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div style="font-size:13px; color:#34495e; font-weight:500;">Step-through mode</div>
+            <div style="font-size:11px; color:#7f8c8d;">Prev/Next tick navigation</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="step-toggle-input" onchange="onStepToggle(this)">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div style="font-size:13px; color:#34495e; font-weight:500;">Compare all algorithms</div>
+            <div style="font-size:11px; color:#7f8c8d;">Run all 6 side by side</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="compare-toggle-input" onchange="onCompareToggle(this)">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Export -->
+    <div>
+      <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#7f8c8d; margin-bottom:10px;">Export</div>
+      <div id="export-hint" style="font-size:11px; color:#95a5a6; margin-bottom:8px; font-style:italic;">Run a simulation to enable export.</div>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <button class="btn" id="settings-export-svg" disabled onclick="exportSVG()">↓ Export as SVG</button>
+        <button class="btn" id="settings-export-png" disabled onclick="exportPNG()">↓ Export as PNG</button>
+      </div>
+    </div>
+
+    <!-- About -->
+    <div style="background:#f8f9fa; border:1px solid #dcdde1; border-radius:3px; padding:12px;">
+      <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#7f8c8d; margin-bottom:6px;">About</div>
+      <div style="font-size:12px; color:#7f8c8d; line-height:1.6;">
+        CS 2200 Process Scheduling Visualizer.<br>
+        Higher priority number = higher priority.<br>
+        Set Arrival = 0 for all processes to start together.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const COLORS = ['#3498db','#2ecc71','#e67e22','#9b59b6','#e74c3c'];
+
+const ALGO_EXPLAINERS = {
+  FCFS:        'Non-preemptive: processes run in arrival order. Simple but can cause long waits.',
+  SJF:         'Non-preemptive: always picks the shortest available burst next. Minimizes average turnaround.',
+  SRTF:        'Preemptive SJF: a newly-arrived shorter job immediately preempts the running process.',
+  RR:          'Preemptive: each process gets a fixed time quantum, then rotates. Fair but not optimal for turnaround.',
+  PRIORITY:    'Preemptive: highest priority runs first. A higher-priority arrival immediately preempts the CPU.',
+  PRIORITY_NP: 'Non-preemptive: highest priority runs first, but once started a burst runs to completion.'
+};
+
+function saveProcesses() {
+  try {
+    localStorage.setItem('scheduler_processes', JSON.stringify(processes));
+    const ind = document.getElementById('save-indicator');
+    ind.style.opacity = '1';
+    clearTimeout(ind._t);
+    ind._t = setTimeout(() => ind.style.opacity = '0', 1200);
+  } catch(e) {}
+}
+
+function loadProcesses() {
+  try {
+    const saved = localStorage.getItem('scheduler_processes');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length >= 2 && parsed.length <= 5 &&
+          parsed.every(p => ['cpu1','io','cpu2','priority','arrival'].every(k => typeof p[k] === 'number'))) {
+        return parsed;
+      }
+    }
+  } catch(e) {}
+  return [
+    {cpu1:3, io:2, cpu2:3, priority:1, arrival:0},
+    {cpu1:4, io:5, cpu2:3, priority:2, arrival:0},
+    {cpu1:6, io:1, cpu2:2, priority:3, arrival:0}
+  ];
+}
+let processes = loadProcesses();
+
+// ── Process Input UI ──────────────────────────────────────────────────────────
+
+function renderProcList() {
+  const list = document.getElementById('proc-list');
+  list.innerHTML = '';
+  processes.forEach((p, i) => {
+    const div = document.createElement('div');
+    div.className = 'process-row';
+    div.innerHTML = `
+      <div class="proc-row-header">
+        <div class="proc-dot" style="background:${COLORS[i]}"></div>
+        <span class="proc-lbl" style="color:${COLORS[i]}">P${i+1}</span>
+        ${processes.length > 2 ? `<button class="remove-btn" data-i="${i}">✕</button>` : ''}
+      </div>
+      <div class="field-grid">
+        <div class="field-grp"><label>CPU Burst 1</label><input type="number" min="1" max="30" value="${p.cpu1}" data-i="${i}" data-f="cpu1"></div>
+        <div class="field-grp"><label>I/O Burst</label><input type="number" min="1" max="30" value="${p.io}" data-i="${i}" data-f="io"></div>
+        <div class="field-grp"><label>CPU Burst 2</label><input type="number" min="1" max="30" value="${p.cpu2}" data-i="${i}" data-f="cpu2"></div>
+        <div class="field-grp"><label>Priority</label><input type="number" min="1" max="10" value="${p.priority}" data-i="${i}" data-f="priority"></div>
+        <div class="field-grp"><label>Arrival</label><input type="number" min="0" max="20" value="${p.arrival}" data-i="${i}" data-f="arrival"></div>
+      </div>`;
+    list.appendChild(div);
+  });
+
+  list.querySelectorAll('input').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const isArrival = inp.dataset.f === 'arrival';
+      const v = Math.max(isArrival ? 0 : 1, parseInt(inp.value) || 0);
+      processes[+inp.dataset.i][inp.dataset.f] = v;
+      inp.value = v;
+      saveProcesses();
+    });
+  });
+  list.querySelectorAll('.remove-btn').forEach(btn => {
+    btn.addEventListener('click', () => { processes.splice(+btn.dataset.i, 1); saveProcesses(); renderProcList(); });
+  });
+  document.getElementById('add-btn').disabled = processes.length >= 5;
+}
+
+// ── Simulation ────────────────────────────────────────────────────────────────
+// phases: -1=not arrived  0=ready1  1=cpu1  2=io  3=ready2  4=cpu2  5=done
+
+function simulate(procs, algo, quantum, concurrentIO) {
+  const n = procs.length;
+  const rem1  = procs.map(p => p.cpu1);
+  const rem2  = procs.map(p => p.cpu2);
+  const remIo = procs.map(p => p.io);
+  const phase  = new Array(n).fill(-1); // all not yet arrived
+  const finish = new Array(n).fill(-1);
+  const cpuLine = [], ioSets = [], eventLog = [], tooltipData = [];
+
+  let readyQ = []; // FIFO ready queue (processes added on arrival / after I/O)
+  let ioQ    = []; // serial I/O queue (used when !concurrentIO)
+  let rrLeft = 0, cur = -1;
+  let tickEvents = []; // events to log for the current tick
+
+  const MAX_T = Math.max(...procs.map(p => p.arrival)) +
+                procs.reduce((s, p) => s + p.cpu1 + p.io + p.cpu2, 0) + 10;
+
+  function pick() {
+    if (!readyQ.length) return -1;
+    let qi = 0;
+    if (algo === 'SJF' || algo === 'SRTF') {
+      qi = readyQ.reduce((bi, _, i) => {
+        const bv = phase[readyQ[bi]] === 0 ? rem1[readyQ[bi]] : rem2[readyQ[bi]];
+        const iv = phase[readyQ[i]]  === 0 ? rem1[readyQ[i]]  : rem2[readyQ[i]];
+        return iv < bv ? i : bi;
+      }, 0);
+    } else if (algo === 'PRIORITY' || algo === 'PRIORITY_NP') {
+      qi = readyQ.reduce((bi, _, i) =>
+        procs[readyQ[i]].priority > procs[readyQ[bi]].priority ? i : bi, 0);
+    }
+    return readyQ.splice(qi, 1)[0];
+  }
+
+  for (let t = 0; t < MAX_T; t++) {
+    if (phase.every(p => p === 5)) break;
+
+    // Arrivals
+    for (let i = 0; i < n; i++) {
+      if (phase[i] === -1 && t >= procs[i].arrival) {
+        phase[i] = 0;
+        readyQ.push(i);
+        tickEvents.push(`P${i+1} arrived`);
+      }
+    }
+
+    // Preemptive priority check
+    if (algo === 'PRIORITY' && cur >= 0 && readyQ.length) {
+      const bestQ = readyQ.reduce((bi, _, i) =>
+        procs[readyQ[i]].priority > procs[readyQ[bi]].priority ? i : bi, 0);
+      if (procs[readyQ[bestQ]].priority > procs[cur].priority) {
+        const old = cur;
+        phase[cur] = phase[cur] === 1 ? 0 : 3;
+        readyQ.push(cur);
+        cur = readyQ.splice(bestQ, 1)[0];
+        phase[cur] = phase[cur] === 0 ? 1 : 4;
+        tickEvents.push(`P${old+1} preempted by P${cur+1}`);
+      }
+    }
+
+    // SRTF preemption check
+    if (algo === 'SRTF' && cur >= 0 && readyQ.length) {
+      const curRem = phase[cur] === 1 ? rem1[cur] : rem2[cur];
+      const bestQ = readyQ.reduce((bi, _, i) => {
+        const bv = phase[readyQ[bi]] === 0 ? rem1[readyQ[bi]] : rem2[readyQ[bi]];
+        const iv = phase[readyQ[i]]  === 0 ? rem1[readyQ[i]]  : rem2[readyQ[i]];
+        return iv < bv ? i : bi;
+      }, 0);
+      const bestRem = phase[readyQ[bestQ]] === 0 ? rem1[readyQ[bestQ]] : rem2[readyQ[bestQ]];
+      if (bestRem < curRem) {
+        const old = cur;
+        phase[cur] = phase[cur] === 1 ? 0 : 3;
+        readyQ.push(cur);
+        cur = readyQ.splice(bestQ, 1)[0];
+        phase[cur] = phase[cur] === 0 ? 1 : 4;
+        tickEvents.push(`P${old+1} preempted by P${cur+1}`);
+      }
+    }
+
+    // RR quantum expiry
+    if (algo === 'RR' && cur >= 0 && rrLeft === 0) {
+      tickEvents.push(`P${cur+1} quantum expired`);
+      phase[cur] = phase[cur] === 1 ? 0 : 3;
+      readyQ.push(cur);
+      cur = -1;
+    }
+
+    // Pick if CPU idle
+    if (cur === -1) {
+      cur = pick();
+      if (cur >= 0) {
+        phase[cur] = phase[cur] === 0 ? 1 : 4;
+        if (algo === 'RR') rrLeft = quantum;
+      }
+    }
+
+    // Record tick
+    cpuLine.push(cur);
+    const ioThis = [];
+    if (concurrentIO) {
+      for (let i = 0; i < n; i++) if (phase[i] === 2) ioThis.push(i);
+    } else {
+      if (ioQ.length > 0) ioThis.push(ioQ[0]);
+    }
+    ioSets.push(ioThis);
+
+    // Tooltip data (snapshot before advancing)
+    tooltipData.push({
+      cpu: cur >= 0 ? {
+        proc: cur, burst: phase[cur] === 1 ? 1 : 2,
+        remaining: phase[cur] === 1 ? rem1[cur] : rem2[cur]
+      } : null,
+      io: ioThis.map(pi => ({ proc: pi, remaining: remIo[pi] }))
+    });
+
+    // Event log
+    let logStr = cur >= 0
+      ? `t=${t}: P${cur+1} — CPU burst ${phase[cur] === 1 ? 1 : 2} (${phase[cur] === 1 ? rem1[cur] : rem2[cur]} remaining)`
+      : `t=${t}: CPU idle`;
+    if (tickEvents.length) logStr += '  ·  ' + tickEvents.join(', ');
+    eventLog.push(logStr);
+    tickEvents = []; // reset; completions below will populate for next tick
+
+    // Advance one tick
+    if (cur >= 0) {
+      if (phase[cur] === 1) rem1[cur]--; else rem2[cur]--;
+      if (algo === 'RR') rrLeft--;
+    }
+    if (concurrentIO) {
+      for (let i = 0; i < n; i++) if (phase[i] === 2) remIo[i]--;
+    } else {
+      if (ioQ.length > 0) remIo[ioQ[0]]--;
+    }
+
+    // CPU burst completion
+    if (cur >= 0) {
+      const rem = phase[cur] === 1 ? rem1[cur] : rem2[cur];
+      if (rem === 0) {
+        const done = cur;
+        if (phase[cur] === 1) {
+          phase[cur] = 2;
+          if (!concurrentIO) ioQ.push(cur);
+          tickEvents.push(`P${done+1} finished CPU1 → I/O`);
+        } else {
+          phase[cur] = 5; finish[cur] = t + 1;
+          tickEvents.push(`P${done+1} completed ✓`);
+        }
+        cur = -1; rrLeft = 0;
+      }
+    }
+
+    // I/O completion → ready2
+    if (concurrentIO) {
+      for (let i = 0; i < n; i++) {
+        if (phase[i] === 2 && remIo[i] === 0) {
+          phase[i] = 3; readyQ.push(i);
+          tickEvents.push(`P${i+1} finished I/O → ready`);
+        }
+      }
+    } else {
+      if (ioQ.length > 0 && remIo[ioQ[0]] === 0) {
+        const done = ioQ.shift();
+        phase[done] = 3; readyQ.push(done);
+        tickEvents.push(`P${done+1} finished I/O → ready`);
+      }
+    }
+  }
+
+  return { cpuLine, ioSets, finish, n, eventLog, tooltipData };
+}
+
+// ── SVG Timeline ──────────────────────────────────────────────────────────────
+
+const CELL = 28, ROW_H = 28, LABEL_W = 72, TIME_H = 22;
+
+function renderSVG(res, mode) {
+  const { cpuLine, ioSets, n } = res;
+  const T = cpuLine.length;
+  const rows = mode === 'compact' ? 2 : n + 1;
+  const W = LABEL_W + T * CELL + CELL;
+  const H = TIME_H + rows * ROW_H + 1;
+  const p = [];
+
+  p.push(`<rect width="${W}" height="${H}" fill="white"/>`);
+
+  // Time axis
+  for (let t = 0; t <= T; t++) {
+    const x = LABEL_W + t * CELL;
+    p.push(`<text x="${x}" y="${TIME_H - 6}" font-family="Consolas,Monaco,monospace" font-size="10" fill="#7f8c8d" text-anchor="middle">${t}</text>`);
+    p.push(`<line x1="${x}" y1="${TIME_H - 3}" x2="${x}" y2="${H}" stroke="#dcdde1" stroke-width="1"/>`);
+  }
+
+  // Row labels and horizontal lines
+  for (let r = 0; r < rows; r++) {
+    const y = TIME_H + r * ROW_H;
+    const lbl = mode === 'compact'
+      ? (r === 0 ? 'CPU' : 'I/O')
+      : (r < n ? `P${r+1} CPU` : 'I/O');
+    p.push(`<text x="${LABEL_W - 6}" y="${y + ROW_H/2 + 4}" font-family="Inter,Roboto,sans-serif" font-size="11" fill="#34495e" text-anchor="end">${lbl}</text>`);
+    p.push(`<line x1="${LABEL_W}" y1="${y}" x2="${W}" y2="${y}" stroke="#dcdde1" stroke-width="1"/>`);
+  }
+  p.push(`<line x1="${LABEL_W}" y1="${H - 1}" x2="${W}" y2="${H - 1}" stroke="#dcdde1" stroke-width="1"/>`);
+
+  // Fill active cells
+  const ioRowY = TIME_H + (mode === 'compact' ? 1 : n) * ROW_H;
+
+  for (let t = 0; t < T; t++) {
+    const x = LABEL_W + t * CELL;
+
+    // CPU row(s)
+    const cp = cpuLine[t];
+    if (cp >= 0) {
+      const y = mode === 'compact' ? TIME_H : TIME_H + cp * ROW_H;
+      const c = COLORS[cp];
+      p.push(`<rect x="${x+1}" y="${y+1}" width="${CELL-1}" height="${ROW_H-1}" fill="${c}33" stroke="${c}" stroke-width="1.5" data-t="${t}" data-type="cpu"/>`);
+      p.push(`<text x="${x + CELL/2}" y="${y + ROW_H/2 + 4}" font-family="Consolas,Monaco,monospace" font-size="10" fill="${c}" font-weight="700" text-anchor="middle" pointer-events="none">P${cp+1}</text>`);
+    }
+
+    // I/O row — split vertically when multiple processes overlap
+    const ios = ioSets[t];
+    if (ios.length) {
+      const sh = (ROW_H - 1) / ios.length;
+      ios.forEach((pi, j) => {
+        const c = COLORS[pi];
+        const sy = ioRowY + 1 + j * sh;
+        p.push(`<rect x="${x+1}" y="${sy}" width="${CELL-1}" height="${sh}" fill="${c}33" stroke="${c}" stroke-width="1" data-t="${t}" data-type="io" data-pi="${pi}"/>`);
+        if (sh >= 12)
+          p.push(`<text x="${x + CELL/2}" y="${sy + sh/2 + 3}" font-family="Consolas,Monaco,monospace" font-size="10" fill="${c}" font-weight="700" text-anchor="middle" pointer-events="none">P${pi+1}</text>`);
+      });
+    }
+  }
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">${p.join('')}</svg>`;
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+
+function renderStats(res, procs) {
+  const { cpuLine, finish, n } = res;
+  const T = cpuLine.length;
+  const util = Math.round(cpuLine.filter(c => c >= 0).length / T * 100);
+
+  const tats = [], waits = [];
+  for (let i = 0; i < n; i++) {
+    const tat  = finish[i] - procs[i].arrival;
+    const wait = tat - procs[i].cpu1 - procs[i].io - procs[i].cpu2;
+    tats.push(tat); waits.push(wait);
+  }
+  const avgTat  = (tats.reduce((a,b)=>a+b,0) / n).toFixed(2);
+  const avgWait = (waits.reduce((a,b)=>a+b,0) / n).toFixed(2);
+
+  document.getElementById('box-tat').textContent  = avgTat;
+  document.getElementById('box-wait').textContent = avgWait;
+  document.getElementById('box-util').textContent = util + '%';
+  document.getElementById('sum-tat').textContent  = avgTat;
+  document.getElementById('sum-wait').textContent = avgWait;
+  document.getElementById('sum-util').textContent = util + '%';
+  document.getElementById('stat-summary').style.display = 'flex';
+
+  const rows = procs.map((p, i) => `
+    <tr>
+      <td><span class="proc-badge" style="background:${COLORS[i]}"></span>P${i+1}</td>
+      <td>${finish[i]}</td>
+      <td>${tats[i]}</td>
+      <td>${waits[i]}</td>
+    </tr>`).join('');
+  document.getElementById('stats-table').innerHTML = `
+    <thead><tr><th>Process</th><th>Finish Time</th><th>Turnaround</th><th>Waiting</th></tr></thead>
+    <tbody>${rows}
+    <tr class="avg-row"><td>Average</td><td>—</td><td>${avgTat}</td><td>${avgWait}</td></tr>
+    </tbody>`;
+  document.getElementById('stats-section').style.display = 'block';
+}
+
+// ── Global State ──────────────────────────────────────────────────────────────
+
+let algoBannerOpen = false;
+
+function toggleAlgoBanner() {
+  algoBannerOpen = !algoBannerOpen;
+  document.getElementById('algo-banner-wrap').classList.toggle('open', algoBannerOpen);
+  const btn = document.getElementById('algo-info-btn');
+  btn.style.color = algoBannerOpen ? '#3498db' : '#7f8c8d';
+  btn.style.borderColor = algoBannerOpen ? '#3498db' : '';
+}
+
+let viewMode    = 'compact';
+let concurrentIO = false;
+let currentResult = null;
+let stepMode    = false;
+let stepT       = 0;
+let compareMode = false;
+
+// ── Settings Panel ────────────────────────────────────────────────────────────
+
+function openSettings() {
+  document.getElementById('settings-panel').style.right = '0';
+  document.getElementById('settings-backdrop').style.display = 'block';
+}
+function closeSettings() {
+  document.getElementById('settings-panel').style.right = '-320px';
+  document.getElementById('settings-backdrop').style.display = 'none';
+}
+
+// ── Toggle Handlers (called from settings panel onchange) ─────────────────────
+
+function onViewToggle(el) {
+  viewMode = el.checked ? 'compact' : 'separated';
+  if (!currentResult || compareMode) return;
+  if (stepMode) renderStep();
+  else { document.getElementById('timeline-inner').innerHTML = renderSVG(currentResult, viewMode); attachTooltips(currentResult); }
+}
+
+function onIOToggle(el) {
+  concurrentIO = el.checked;
+  document.getElementById('io-mode-hint').textContent = concurrentIO ? 'Real-world mode' : 'CS 2200 mode';
+  if (currentResult) rerun();
+}
+
+function onStepToggle(el) {
+  stepMode = el.checked;
+  if (stepMode && compareMode) {
+    compareMode = false;
+    document.getElementById('compare-toggle-input').checked = false;
+  }
+  document.getElementById('step-controls').style.display = stepMode ? 'flex' : 'none';
+  document.getElementById('step-log').style.display = stepMode ? 'block' : 'none';
+  if (!currentResult) return;
+  if (stepMode) { stepT = 0; renderStep(); }
+  else { document.getElementById('timeline-inner').innerHTML = renderSVG(currentResult, viewMode); attachTooltips(currentResult); }
+}
+
+function onCompareToggle(el) {
+  compareMode = el.checked;
+  if (compareMode && stepMode) {
+    stepMode = false;
+    document.getElementById('step-toggle-input').checked = false;
+    document.getElementById('step-controls').style.display = 'none';
+    document.getElementById('step-log').style.display = 'none';
+  }
+  if (compareMode) { runCompare(); }
+  else if (currentResult) {
+    document.getElementById('timeline-inner').innerHTML = renderSVG(currentResult, viewMode);
+    renderStats(currentResult, processes);
+    attachTooltips(currentResult);
+  } else {
+    document.getElementById('timeline-inner').innerHTML = '<div class="placeholder">Configure processes and click Run to see the schedule.</div>';
+    document.getElementById('stats-section').style.display = 'none';
+  }
+}
+
+// ── Step-Through ──────────────────────────────────────────────────────────────
+
+function stepBy(delta) {
+  if (!currentResult) return;
+  stepT = Math.max(0, Math.min(currentResult.cpuLine.length - 1, stepT + delta));
+  renderStep();
+}
+
+function renderStep() {
+  if (!currentResult) return;
+  const T = currentResult.cpuLine.length;
+  const rows = viewMode === 'compact' ? 2 : currentResult.n + 1;
+  const gridH = rows * ROW_H + 1;
+
+  let svg = renderSVG(currentResult, viewMode);
+  const hx = LABEL_W + stepT * CELL;
+  const highlight = `<rect x="${hx}" y="${TIME_H}" width="${CELL}" height="${gridH}" fill="#e74c3c22" stroke="#e74c3c" stroke-width="1.5" pointer-events="none"/>`;
+  svg = svg.replace('</svg>', highlight + '</svg>');
+
+  document.getElementById('timeline-inner').innerHTML = svg;
+  document.getElementById('step-tick-label').textContent = `t = ${stepT}`;
+  document.getElementById('step-log-text').textContent = currentResult.eventLog[stepT] || '';
+  document.getElementById('btn-prev-step').disabled = stepT === 0;
+  document.getElementById('btn-next-step').disabled = stepT >= T - 1;
+  attachTooltips(currentResult);
+}
+
+// ── Compare View ──────────────────────────────────────────────────────────────
+
+function runCompare() {
+  const quantum = Math.max(1, parseInt(document.getElementById('quantum-input').value) || 2);
+  const algos  = ['FCFS','SJF','SRTF','RR','PRIORITY','PRIORITY_NP'];
+  const labels = { FCFS:'FCFS', SJF:'SJF', SRTF:'SRTF', RR:`Round Robin (q=${quantum})`, PRIORITY:'Priority (Preemptive)', PRIORITY_NP:'Priority (Non-Preemptive)' };
+
+  let html = '<div style="display:flex; flex-direction:column; gap:16px; padding:12px;">';
+  algos.forEach(a => {
+    const res = simulate(processes, a, quantum, concurrentIO);
+    const { cpuLine, finish } = res;
+    const T = cpuLine.length;
+    const util    = Math.round(cpuLine.filter(c => c >= 0).length / T * 100);
+    const tats    = processes.map((p, i) => finish[i] - p.arrival);
+    const waits   = processes.map((p, i) => tats[i] - p.cpu1 - p.io - p.cpu2);
+    const avgTat  = (tats.reduce((a,b)=>a+b,0) / processes.length).toFixed(2);
+    const avgWait = (waits.reduce((a,b)=>a+b,0) / processes.length).toFixed(2);
+    html += `
+      <div style="border:1px solid #dcdde1; border-radius:3px; overflow:hidden;">
+        <div style="background:#ecf0f1; padding:6px 12px; font-size:12px; font-weight:600; color:#34495e; display:flex; justify-content:space-between; align-items:center;">
+          <span>${labels[a]}</span>
+          <span style="font-family:Consolas,Monaco,monospace; color:#7f8c8d; font-weight:400; font-size:11px;">TAT: ${avgTat} · Wait: ${avgWait} · Util: ${util}%</span>
+        </div>
+        <div style="overflow-x:auto;">${renderSVG(res, 'compact')}</div>
+      </div>`;
+  });
+  html += '</div>';
+  document.getElementById('timeline-inner').innerHTML = html;
+  document.getElementById('stats-section').style.display = 'none';
+  // clear tooltip handler in compare mode
+  const inner = document.getElementById('timeline-inner');
+  inner.onmousemove = null;
+  inner.onmouseleave = null;
+}
+
+// ── Tooltips ──────────────────────────────────────────────────────────────────
+
+function attachTooltips(res) {
+  const inner   = document.getElementById('timeline-inner');
+  const tooltip = document.getElementById('svg-tooltip');
+  inner.onmousemove = e => {
+    const el = e.target;
+    if (!el.dataset || !el.dataset.t) { tooltip.style.display = 'none'; return; }
+    const t = +el.dataset.t;
+    const d = res.tooltipData[t];
+    if (!d) { tooltip.style.display = 'none'; return; }
+    let text = '';
+    if (el.dataset.type === 'cpu' && d.cpu) {
+      const r = d.cpu.remaining;
+      text = `P${d.cpu.proc+1} — CPU burst ${d.cpu.burst} · ${r} unit${r !== 1 ? 's' : ''} remaining`;
+    } else if (el.dataset.type === 'io') {
+      const pi = +el.dataset.pi;
+      const entry = d.io.find(x => x.proc === pi);
+      if (entry) { const r = entry.remaining; text = `P${pi+1} — I/O · ${r} unit${r !== 1 ? 's' : ''} remaining`; }
+    }
+    if (!text) { tooltip.style.display = 'none'; return; }
+    tooltip.textContent = text;
+    tooltip.style.display = 'block';
+    tooltip.style.left = (e.clientX + 12) + 'px';
+    tooltip.style.top  = (e.clientY - 28) + 'px';
+  };
+  inner.onmouseleave = () => { tooltip.style.display = 'none'; };
+}
+
+// ── Export ────────────────────────────────────────────────────────────────────
+
+function exportSVG() {
+  if (compareMode) { alert('Export is not available in Compare mode — switch to single algorithm view first.'); return; }
+  if (!currentResult) return;
+  const svgEl = document.querySelector('#timeline-inner svg');
+  if (!svgEl) return;
+  const svgStr = new XMLSerializer().serializeToString(svgEl);
+  const blob = new Blob([svgStr], {type: 'image/svg+xml'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `schedule_${document.getElementById('algo-select').value.toLowerCase()}.svg`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function exportPNG() {
+  if (compareMode) { alert('Export is not available in Compare mode — switch to single algorithm view first.'); return; }
+  if (!currentResult) return;
+  const svgEl = document.querySelector('#timeline-inner svg');
+  if (!svgEl) return;
+  const svgStr = new XMLSerializer().serializeToString(svgEl);
+  const w = svgEl.getAttribute('width');
+  const h = svgEl.getAttribute('height');
+  const img = new Image();
+  const blob = new Blob([svgStr], {type: 'image/svg+xml'});
+  const url = URL.createObjectURL(blob);
+  img.onload = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = w * 2;
+    canvas.height = h * 2;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(2, 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(img, 0, 0);
+    URL.revokeObjectURL(url);
+    const a = document.createElement('a');
+    a.href = canvas.toDataURL('image/png');
+    a.download = `schedule_${document.getElementById('algo-select').value.toLowerCase()}.png`;
+    a.click();
+  };
+  img.src = url;
+}
+
+// ── Rerun ─────────────────────────────────────────────────────────────────────
+
+function rerun() {
+  const algo    = document.getElementById('algo-select').value;
+  const quantum = Math.max(1, parseInt(document.getElementById('quantum-input').value) || 2);
+  if (compareMode) { runCompare(); return; }
+  currentResult = simulate(processes, algo, quantum, concurrentIO);
+  document.getElementById('settings-export-svg').disabled = false;
+  document.getElementById('settings-export-png').disabled = false;
+  document.getElementById('export-hint').style.display = 'none';
+  if (stepMode) { stepT = 0; renderStep(); }
+  else {
+    document.getElementById('timeline-inner').innerHTML = renderSVG(currentResult, viewMode);
+    attachTooltips(currentResult);
+  }
+  renderStats(currentResult, processes);
+}
+
+// ── Events ────────────────────────────────────────────────────────────────────
+
+document.getElementById('algo-select').addEventListener('change', function () {
+  document.getElementById('quantum-wrap').classList.toggle('visible', this.value === 'RR');
+  document.getElementById('algo-explainer').textContent = ALGO_EXPLAINERS[this.value] || '';
+});
+
+document.getElementById('add-btn').addEventListener('click', () => {
+  if (processes.length < 5) {
+    processes.push({cpu1:3, io:2, cpu2:3, priority: processes.length + 1, arrival: 0});
+    saveProcesses();
+    renderProcList();
+  }
+});
+
+document.getElementById('reset-btn').addEventListener('click', () => {
+  if (!confirm('Reset to defaults?')) return;
+  localStorage.removeItem('scheduler_processes');
+  processes = [
+    {cpu1:3, io:2, cpu2:3, priority:1, arrival:0},
+    {cpu1:4, io:5, cpu2:3, priority:2, arrival:0},
+    {cpu1:6, io:1, cpu2:2, priority:3, arrival:0}
+  ];
+  renderProcList();
+});
+
+document.getElementById('btn-randomize').addEventListener('click', () => {
+  const n = processes.length;
+  const priorities = Array.from({length: n}, (_, i) => i + 1).sort(() => Math.random() - 0.5);
+  processes = processes.map((_, i) => ({
+    cpu1:     Math.floor(Math.random() * 8) + 1,
+    io:       Math.floor(Math.random() * 6) + 1,
+    cpu2:     Math.floor(Math.random() * 6) + 1,
+    priority: priorities[i],
+    arrival:  Math.floor(Math.random() * 5)
+  }));
+  saveProcesses();
+  renderProcList();
+});
+
+document.getElementById('run-btn').addEventListener('click', rerun);
+
+document.addEventListener('keydown', e => {
+  if (!stepMode || !currentResult) return;
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (e.key === 'ArrowLeft')  { e.preventDefault(); stepBy(-1); }
+  if (e.key === 'ArrowRight') { e.preventDefault(); stepBy(1); }
+});
+
+// Init
+document.getElementById('algo-explainer').textContent = ALGO_EXPLAINERS[document.getElementById('algo-select').value] || '';
+renderProcList();
+</script>
+</body>
+</html>
