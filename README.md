@@ -2,7 +2,7 @@
 
 An interactive, cycle-by-cycle datapath visualizer for the LC-5200a processor — built to help students understand how instructions move through the datapath and what control signals are active at each microcode cycle.
 
-🔗 **[Live Demo](https://tobi-obitayo.github.io/lc5200-datapath-visualizer/lc5200-datapath-visualizer.html)**
+**[Live Demo](https://tobi-obitayo.github.io/lc5200-datapath-visualizer/lc5200-datapath-visualizer.html)**
 
 ---
 
