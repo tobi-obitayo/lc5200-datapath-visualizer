@@ -702,22 +702,13 @@ const MAX3 = ms('MAX3', [0,0, 0,0,1, 0,0, 0,0,0,0,0, 0,0,1,0,0, 1,1],
    INSTRUCTION DEFINITIONS
    ============================================================ */
 const INSTRUCTIONS = {
-  'ADD':               [FETCH0, FETCH1, FETCH2, ADD0, ADD1, ADD2],
   'NAND':              [FETCH0, FETCH1, FETCH2, NAND0, NAND1, NAND2],
   'ADDI':              [FETCH0, FETCH1, FETCH2, ADDI0, ADDI1, ADDI2],
   'LW':                [FETCH0, FETCH1, FETCH2, LW0, LW1, LW2, LW3],
-  'SW':                [FETCH0, FETCH1, FETCH2, SW0, SW1, SW2, SW3],
   'BEQ (not taken)':   [FETCH0, FETCH1, FETCH2, BEQ0, BEQ1, BEQ2],
   'BEQ (taken)':       [FETCH0, FETCH1, FETCH2, BEQ0, BEQ1, BEQ2, BEQ_BGT4, BEQ_BGT5, BEQ_BGT6],
   'JALR':              [FETCH0, FETCH1, FETCH2, JALR0, JALR1],
-  'HALT':              [FETCH0, FETCH1, FETCH2, HALT0],
-  'BGT (not taken)':   [FETCH0, FETCH1, FETCH2, BGT1, BGT2, BGT3],
-  'BGT (taken)':       [FETCH0, FETCH1, FETCH2, BGT1, BGT2, BGT3, BEQ_BGT4, BEQ_BGT5, BEQ_BGT6],
   'LEA':               [FETCH0, FETCH1, FETCH2, LEA1, LEA2, LEA3],
-  'MIN (A < B)':       [FETCH0, FETCH1, FETCH2, MIN1, MIN2, MIN3, MINMAX4],
-  'MIN (A >= B)':      [FETCH0, FETCH1, FETCH2, MIN1, MIN2, MIN3, MINMAX5],
-  'MAX (A > B)':       [FETCH0, FETCH1, FETCH2, MAX1, MAX2, MAX3, MINMAX4],
-  'MAX (A <= B)':      [FETCH0, FETCH1, FETCH2, MAX1, MAX2, MAX3, MINMAX5],
 };
 
 /* ============================================================
@@ -828,7 +819,7 @@ const regInfoBox = document.getElementById('reg-info-box');
 const aluFuncText = document.getElementById('alu-func-text');
 const regnoText = document.getElementById('regno-text');
 
-let currentInstr = 'ADD';
+let currentInstr = 'NAND';
 let currentCycle = 0;
 let showFetch = false;
 let animateFlow = true;
